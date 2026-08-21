@@ -16,7 +16,7 @@
     .entry{display:flex;align-items:center;gap:13px;width:100%;padding:15px 14px;margin:8px 0;border:1px solid rgba(255,255,255,.055);border-radius:15px;background:linear-gradient(135deg,var(--card-hi),var(--card));text-align:left;box-shadow:0 10px 24px rgba(0,0,0,.12)} .entry:active{transform:scale(.99)}
     .icon{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:#252e38;border:1px solid #3a4652;font-size:20px;flex:none}.entry strong{display:block;font-size:15px}.entry span{font-size:12px;color:var(--muted);display:block;margin-top:2px}.arrow{margin-left:auto;color:#afbbb4;font-size:20px}
     .chips{display:flex;gap:8px;overflow:auto;padding-bottom:2px;scrollbar-width:none}.chip{white-space:nowrap;border:1px solid #34404a;border-radius:999px;padding:9px 12px;background:#151c23;color:#cdd6d1;font-size:13px;font-weight:700}.chip.active{background:var(--mint);border-color:var(--mint);color:#0e2018;box-shadow:0 0 18px rgba(0,255,148,.2)}
-    .card{position:relative;background:linear-gradient(145deg,#1b232c,#141a20);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:15px 46px 15px 15px;margin:10px 0;box-shadow:0 12px 25px rgba(0,0,0,.14)}.card h3{font-size:16px;line-height:1.18;margin:0 0 8px;letter-spacing:-.015em}.meta,.tags{font-size:12px;color:var(--muted)}.tags{margin-top:10px;color:#c4d1ca}.tag{display:inline-block;background:#28333a;border:1px solid #34434a;border-radius:6px;padding:4px 6px;margin:0 4px 4px 0}.save{position:absolute;right:13px;top:14px;width:28px;height:28px;border-radius:9px;background:transparent;font-size:22px;color:#e8f0eb}.save.saved{color:var(--mint)}.open{margin-top:12px;border-radius:9px;background:var(--mint);color:#102018;padding:9px 11px;font-size:13px;font-weight:800;box-shadow:0 4px 16px rgba(0,255,148,.18)}
+      .card{position:relative;background:linear-gradient(145deg,#1b232c,#141a20);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:15px 46px 15px 15px;margin:10px 0;box-shadow:0 12px 25px rgba(0,0,0,.14)}.card h3{font-size:16px;line-height:1.18;margin:0 0 8px;letter-spacing:-.015em}.meta,.tags{font-size:12px;color:var(--muted)}.tags{margin-top:10px;color:#c4d1ca}.tag{display:inline-block;background:#28333a;border:1px solid #34434a;border-radius:6px;padding:4px 6px;margin:0 4px 4px 0}.save{position:absolute;right:13px;top:14px;width:28px;height:28px;border-radius:9px;background:transparent;font-size:22px;color:#e8f0eb}.save.saved{color:var(--mint)}.open{display:inline-block;margin-top:12px;border-radius:9px;background:var(--mint);color:#102018;padding:9px 11px;font-size:13px;font-weight:800;box-shadow:0 4px 16px rgba(0,255,148,.18);text-decoration:none}
     .empty{border:1px dashed #405049;border-radius:16px;padding:24px 18px;text-align:center;color:var(--muted);background:#141b21}.empty b{color:var(--ink);display:block;margin-bottom:6px}
     .back{background:none;color:var(--mint);padding:0;font-weight:800;margin:0 0 15px}.back:before{content:'← ';}.screen{display:none}.screen.active{display:block}.bottom{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,430px);display:flex;justify-content:space-around;padding:10px 8px max(10px,env(safe-area-inset-bottom));background:rgba(14,19,24,.88);border-top:1px solid #26323a;backdrop-filter:blur(14px)}.nav{background:transparent;font-size:11px;font-weight:700;color:#88938e;display:grid;gap:4px;place-items:center;min-width:58px}.nav-icon{width:20px;height:20px;stroke:currentColor;stroke-width:1.9;fill:none;stroke-linecap:round;stroke-linejoin:round}.nav.active{color:var(--mint)}
     .result-note{font-size:13px;color:var(--muted);margin:0 0 8px}.hidden{display:none!important}@media(min-width:600px){.phone{min-height:800px;margin:22px auto;border-radius:28px;box-shadow:0 18px 50px rgba(20,35,30,.17)}}
@@ -77,7 +77,7 @@
       const tags=document.createElement('div');tags.className='tags';
       item.tags.forEach(tag=>{const chip=document.createElement('span');chip.className='tag';chip.textContent=tag;tags.append(chip)});
       const save=document.createElement('button');save.type='button';save.className='save'+(saved.has(item.id)?' saved':'');save.dataset.saveId=item.id;save.setAttribute('aria-label','Сохранить');save.textContent=saved.has(item.id)?'★':'☆';
-      const open=document.createElement('button');open.type='button';open.className='open';open.dataset.openId=item.id;open.textContent='Открыть в Telegram';
+        const open=document.createElement('a');open.className='open';open.dataset.openId=item.id;open.href=desktopPostUrl(item.url);open.target='_blank';open.rel='noopener noreferrer';open.textContent='Открыть в Telegram';
       card.append(title,meta,tags,save,open);return card;
     }
     function fill(selector,list,message){
@@ -125,17 +125,33 @@
       renderHome($('#homeSearch').value);
     }
     function show(id){document.querySelectorAll('.screen').forEach(screen=>screen.classList.toggle('active',screen.id===id));document.querySelectorAll('.nav').forEach(button=>button.classList.toggle('active',button.dataset.screen===id));document.documentElement.scrollTop=0;document.body.scrollTop=0;}
-    function openTelegram(id){
-      const url=itemsById.get(String(id))?.url;
-      if(!url||!/^https:\/\/t\.me\//i.test(url))return;
-      const app=window.Telegram?.WebApp;
-      if(typeof app?.openTelegramLink==='function')app.openTelegramLink(url);
-      else if(typeof app?.openLink==='function')app.openLink(url);
-      else window.location.assign(url);
+      function isDesktopApp(){
+        return ['macos','tdesktop'].includes(String(window.Telegram?.WebApp?.platform||'').toLowerCase());
+      }
+      function desktopPostUrl(url){
+        if(!isDesktopApp())return url;
+        const match=String(url||'').match(/^https:\/\/t\.me\/c\/(\d+)\/(\d+)/i);
+        return match?`tg://privatepost?channel=${match[1]}&post=${match[2]}`:url;
+      }
+      function openTelegram(event,link){
+        const url=itemsById.get(String(link.dataset.openId))?.url;
+        if(!url||!/^https:\/\/t\.me\//i.test(url)){event.preventDefault();return}
+        const app=window.Telegram?.WebApp;
+        if(isDesktopApp()){
+          event.preventDefault();
+          window.open(desktopPostUrl(url),'_blank','noopener,noreferrer');
+          try{app?.close()}catch(_){}
+          return;
+        }
+        event.preventDefault();
+        if(typeof app?.openTelegramLink==='function'){
+          app.openTelegramLink(url);
+          try{app.close()}catch(_){}
+        }else window.location.assign(url);
     }
     document.addEventListener('click',event=>{
       const screen=event.target.closest('[data-screen]');if(screen){show(screen.dataset.screen);return}
-      const open=event.target.closest('[data-open-id]');if(open){openTelegram(open.dataset.openId);return}
+        const open=event.target.closest('[data-open-id]');if(open){openTelegram(event,open);return}
       const save=event.target.closest('[data-save-id]');if(save){const id=save.dataset.saveId;saved.has(id)?saved.delete(id):saved.add(id);localStorage.setItem('smyslogen-favorites',JSON.stringify([...saved]));render();return}
       const chip=event.target.closest('[data-topic]');if(chip){currentTopic=chip.dataset.topic;render()}
     });
