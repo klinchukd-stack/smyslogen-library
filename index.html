@@ -77,7 +77,7 @@
       const tags=document.createElement('div');tags.className='tags';
       item.tags.forEach(tag=>{const chip=document.createElement('span');chip.className='tag';chip.textContent=tag;tags.append(chip)});
       const save=document.createElement('button');save.type='button';save.className='save'+(saved.has(item.id)?' saved':'');save.dataset.saveId=item.id;save.setAttribute('aria-label','Сохранить');save.textContent=saved.has(item.id)?'★':'☆';
-        const open=document.createElement('a');open.className='open';open.dataset.openId=item.id;open.href=desktopPostUrl(item.url);open.target='_blank';open.rel='noopener noreferrer';open.textContent='Открыть в Telegram';
+        const open=document.createElement('a');open.className='open';open.dataset.openId=item.id;open.href=item.url;open.target='_blank';open.rel='noopener noreferrer';open.textContent='Открыть в Telegram';
       card.append(title,meta,tags,save,open);return card;
     }
     function fill(selector,list,message){
@@ -128,19 +128,16 @@
       function isDesktopApp(){
         return ['macos','tdesktop'].includes(String(window.Telegram?.WebApp?.platform||'').toLowerCase());
       }
-      function desktopPostUrl(url){
-        if(!isDesktopApp())return url;
-        const match=String(url||'').match(/^https:\/\/t\.me\/c\/(\d+)\/(\d+)/i);
-        return match?`tg://privatepost?channel=${match[1]}&post=${match[2]}`:url;
-      }
       function openTelegram(event,link){
         const url=itemsById.get(String(link.dataset.openId))?.url;
         if(!url||!/^https:\/\/t\.me\//i.test(url)){event.preventDefault();return}
         const app=window.Telegram?.WebApp;
         if(isDesktopApp()){
           event.preventDefault();
-          window.open(desktopPostUrl(url),'_blank','noopener,noreferrer');
-          try{app?.close()}catch(_){}
+          if(typeof app?.openLink==='function'){
+            app.openLink(url);
+            try{app.close()}catch(_){}
+          }else window.open(url,'_blank','noopener,noreferrer');
           return;
         }
         event.preventDefault();
