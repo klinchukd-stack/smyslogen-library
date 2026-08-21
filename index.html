@@ -55,52 +55,92 @@
     <button class="nav" data-screen="favorites"><svg class="nav-icon" viewBox="0 0 24 24"><path d="m12 3 2.78 5.63 6.22.9-4.5 4.38 1.06 6.19L12 17.18 6.44 20.1 7.5 13.91 3 9.53l6.22-.9z"></path></svg>Избранное</button>
   </nav>
   <script>
-    const fixTag=t=>t==='Целевая аудитрия'?'Целевая аудитория':t;
-    let items=[];
+    /* Версия 2: карточки создаются через DOM, а ссылка открывается только по ID материала. */
+    const API_URL='https://smyslogen-library-api.klinchuk-d.workers.dev/library';
+    const fixTag=t=>t==='Целевая аудитрия'?'Целевая аудитория':String(t||'').trim();
     const topicOrder=['Продажи','Упаковка себя','Офер и текст','Целевая аудитория','Структура','Смысловые иллюстрации','Лид-магнит и призыв','Конкуренты','Метрики и докрутка','Практические эфиры','Гости','Нейросети','Интервью','Другое','Курсы'];
-    let topics=['Все'];
-    const saved=new Set(JSON.parse(localStorage.getItem('smyslogen-favorites')||'[]')); let currentTopic='Все';
+    const saved=new Set(JSON.parse(localStorage.getItem('smyslogen-favorites')||'[]'));
+    let items=[],itemsById=new Map(),topics=['Все'],currentTopic='Все';
     const byNewest=(a,b)=>Number(b.id)-Number(a.id);
-    const esc=s=>String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-    const searchText=x=>[x.title,x.format,x.niches,x.note,...x.tags].join(' ').toLowerCase();
-    function empty(text='По этому запросу ничего не нашлось.'){return `<div class="empty"><b>Пока пусто</b>${text}</div>`}
-    function card(item){const meta=[item.format,item.niches].filter(Boolean).join(' · ')||item.tags.join(' · ');return `<div class="card material" data-id="${esc(item.id)}"><h3>${esc(item.title)}</h3><div class="meta">${esc(meta)}</div><div class="tags">${item.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div><button class="save ${saved.has(item.id)?'saved':''}" aria-label="Сохранить">${saved.has(item.id)?'★':'☆'}</button><button class="open" data-url="${esc(item.url)}">Открыть в Telegram</button></div>`}
-    function renderHome(query=''){const hasQuery=Boolean(query.trim());const found=hasQuery?items.filter(x=>searchText(x).includes(query.toLowerCase())).sort(byNewest):items.slice().sort(byNewest).slice(0,3);document.querySelector('#quickEntry').classList.toggle('hidden',hasQuery);document.querySelector('#homeSectionTitle').textContent=hasQuery?`Результаты поиска · ${found.length}`:'Новое в клубе';document.querySelector('#homeCards').innerHTML=found.map(card).join('')||empty()}
-    window.searchLibrary=renderHome;
+    const searchText=item=>[item.title,item.format,item.niches,item.note,...item.tags].join(' ').toLocaleLowerCase('ru');
+    const $=selector=>document.querySelector(selector);
 
+    function makeEmpty(text='По этому запросу ничего не нашлось.'){
+      const box=document.createElement('div');box.className='empty';
+      const title=document.createElement('b');title.textContent='Пока пусто';
+      box.append(title,document.createTextNode(text));return box;
+    }
+    function makeCard(item){
+      const card=document.createElement('article');card.className='card material';card.dataset.id=item.id;
+      const title=document.createElement('h3');title.textContent=item.title;
+      const meta=document.createElement('div');meta.className='meta';meta.textContent=[item.format,item.niches].filter(Boolean).join(' · ')||item.tags.join(' · ');
+      const tags=document.createElement('div');tags.className='tags';
+      item.tags.forEach(tag=>{const chip=document.createElement('span');chip.className='tag';chip.textContent=tag;tags.append(chip)});
+      const save=document.createElement('button');save.type='button';save.className='save'+(saved.has(item.id)?' saved':'');save.dataset.saveId=item.id;save.setAttribute('aria-label','Сохранить');save.textContent=saved.has(item.id)?'★':'☆';
+      const open=document.createElement('button');open.type='button';open.className='open';open.dataset.openId=item.id;open.textContent='Открыть в Telegram';
+      card.append(title,meta,tags,save,open);return card;
+    }
+    function fill(selector,list,message){
+      const root=$(selector);root.replaceChildren(...(list.length?list.map(makeCard):[makeEmpty(message)]));
+    }
+    function renderHome(query=''){
+      const hasQuery=Boolean(query.trim());
+      const found=(hasQuery?items.filter(item=>searchText(item).includes(query.toLocaleLowerCase('ru'))):items.slice().sort(byNewest).slice(0,3)).sort(byNewest);
+      $('#quickEntry').classList.toggle('hidden',hasQuery);
+      $('#homeSectionTitle').textContent=hasQuery?`Результаты поиска · ${found.length}`:'Новое в клубе';
+      fill('#homeCards',found);
+    }
+    window.searchLibrary=renderHome;
     function setItems(raw){
-      items=(Array.isArray(raw)?raw:[]).filter(x=>x&&x.status==='Готово').map(x=>({...x,tags:(x.tags||[]).map(fixTag),id:String(x.id)}));
-      topics=['Все',...topicOrder.filter(t=>items.some(x=>x.tags.includes(t))),...Array.from(new Set(items.flatMap(x=>x.tags))).filter(t=>!topicOrder.includes(t)).sort((a,b)=>a.localeCompare(b,'ru'))];
+      const unique=new Map();
+      (Array.isArray(raw)?raw:[]).forEach(source=>{
+        if(!source||source.status!=='Готово'||!source.id||!source.url)return;
+        const item={id:String(source.id),title:String(source.title||'Без названия'),url:String(source.url),tags:(Array.isArray(source.tags)?source.tags:[]).map(fixTag).filter(Boolean),format:String(source.format||''),niches:String(source.niches||''),note:String(source.note||'')};
+        unique.set(item.id,item);
+      });
+      items=[...unique.values()];itemsById=unique;
+      topics=['Все',...topicOrder.filter(tag=>items.some(item=>item.tags.includes(tag))),...Array.from(new Set(items.flatMap(item=>item.tags))).filter(tag=>!topicOrder.includes(tag)).sort((a,b)=>a.localeCompare(b,'ru'))];
+      if(!topics.includes(currentTopic))currentTopic='Все';
     }
-    function showLoadError(message){
-      document.querySelector('#homeSectionTitle').textContent='Библиотека пока недоступна';
-      document.querySelector('#homeCards').innerHTML=empty(message||'Открой библиотеку через Telegram и попробуй ещё раз.');
-    }
-    function loadLibrary(){
-      try{window.Telegram?.WebApp?.ready();window.Telegram?.WebApp?.expand()}catch(_){ }
-      const initData=encodeURIComponent(window.Telegram?.WebApp?.initData||'');
-      fetch('https://smyslogen-library-api.klinchuk-d.workers.dev/library?initData='+initData)
-        .then(response=>{if(!response.ok)throw new Error('network');return response.json()})
-        .then(payload=>{if(payload&&payload.ok){setItems(payload.items);render()}else showLoadError(payload?.message||'Библиотека доступна только участникам клуба.')})
-        .catch(()=>showLoadError('Не удалось подключиться к библиотеке. Попробуй ещё раз.'));
+    function showLoadError(message){$('#homeSectionTitle').textContent='Библиотека пока недоступна';fill('#homeCards',[],message||'Не удалось загрузить материалы. Попробуй ещё раз.');}
+    async function loadLibrary(){
+      try{window.Telegram?.WebApp?.ready();window.Telegram?.WebApp?.expand()}catch(_){}
+      const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),30000);
+      try{
+        const initData=encodeURIComponent(window.Telegram?.WebApp?.initData||'');
+        const response=await fetch(`${API_URL}?initData=${initData}`,{signal:controller.signal,cache:'no-store'});
+        const payload=await response.json();
+        if(!response.ok||!payload?.ok)throw new Error(payload?.message||'Не удалось загрузить материалы.');
+        setItems(payload.items);render();
+      }catch(error){showLoadError(error.message||'Не удалось подключиться к библиотеке. Попробуй ещё раз.')}finally{clearTimeout(timer)}
     }
     function render(){
-      document.querySelector('#startCards').innerHTML=items.filter(x=>x.tags.includes('С чего начать')).sort(byNewest).map(card).join('')||empty();
-      document.querySelector('#aiCards').innerHTML=items.filter(x=>x.tags.includes('Нейросети')).sort(byNewest).map(card).join('')||empty();
-      document.querySelector('#guestCards').innerHTML=items.filter(x=>x.tags.includes('Гости')).sort(byNewest).map(card).join('')||empty();
-      document.querySelector('#breakdownCards').innerHTML=items.filter(x=>x.tags.includes('Разборы')).sort(byNewest).map(card).join('')||empty();
-      document.querySelector('#topicChips').innerHTML=topics.map(t=>`<button class="chip ${t===currentTopic?'active':''}" data-topic="${esc(t)}">${esc(t)}</button>`).join('');
-      document.querySelector('#topicCards').innerHTML=items.filter(x=>currentTopic==='Все'||x.tags.includes(currentTopic)).sort(byNewest).map(card).join('')||empty('В этой теме пока нет материалов.');
-      const fav=items.filter(x=>saved.has(x.id)).sort(byNewest);document.querySelector('#favoriteCards').innerHTML=fav.map(card).join('');document.querySelector('#emptyFavorites').classList.toggle('hidden',fav.length>0);
-      renderHome(document.querySelector('#homeSearch').value);
+      fill('#startCards',items.filter(item=>item.tags.includes('С чего начать')).sort(byNewest));
+      fill('#aiCards',items.filter(item=>item.tags.includes('Нейросети')).sort(byNewest));
+      fill('#guestCards',items.filter(item=>item.tags.includes('Гости')).sort(byNewest));
+      fill('#breakdownCards',items.filter(item=>item.tags.includes('Разборы')).sort(byNewest));
+      const chips=$('#topicChips');chips.replaceChildren(...topics.map(topic=>{const button=document.createElement('button');button.type='button';button.className='chip'+(topic===currentTopic?' active':'');button.dataset.topic=topic;button.textContent=topic;return button}));
+      fill('#topicCards',items.filter(item=>currentTopic==='Все'||item.tags.includes(currentTopic)).sort(byNewest),'В этой теме пока нет материалов.');
+      const favorites=items.filter(item=>saved.has(item.id)).sort(byNewest);fill('#favoriteCards',favorites);$('#emptyFavorites').classList.toggle('hidden',favorites.length>0);
+      renderHome($('#homeSearch').value);
     }
-    function show(id){document.querySelectorAll('.screen').forEach(x=>x.classList.toggle('active',x.id===id));document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('active',x.dataset.screen===id));window.scrollTo(0,0)}
-    function openTelegram(url){if(window.Telegram?.WebApp?.openTelegramLink)window.Telegram.WebApp.openTelegramLink(url);else window.open(url,'_blank','noopener')}
-    document.addEventListener('click',e=>{const go=e.target.closest('[data-screen]');if(go){show(go.dataset.screen);return}const open=e.target.closest('.open');if(open){openTelegram(open.dataset.url);return}const save=e.target.closest('.save');if(save){const id=save.closest('.material').dataset.id;if(saved.has(id))saved.delete(id);else saved.add(id);localStorage.setItem('smyslogen-favorites',JSON.stringify([...saved]));render();return}const chip=e.target.closest('[data-topic]');if(chip){currentTopic=chip.dataset.topic;render()}});
-    document.addEventListener('input',e=>{if(e.target.classList.contains('filterInput')){const q=e.target.value.toLowerCase();document.querySelectorAll('#'+e.target.dataset.target+' .material').forEach(x=>{const item=items.find(i=>i.id===x.dataset.id);x.classList.toggle('hidden',item&&!searchText(item).includes(q))})}});
-    const homeInput=document.querySelector('#homeSearch');
-    homeInput.addEventListener('input',()=>renderHome(homeInput.value));
-    homeInput.addEventListener('keyup',()=>renderHome(homeInput.value));
+    function show(id){document.querySelectorAll('.screen').forEach(screen=>screen.classList.toggle('active',screen.id===id));document.querySelectorAll('.nav').forEach(button=>button.classList.toggle('active',button.dataset.screen===id));document.documentElement.scrollTop=0;document.body.scrollTop=0;}
+    function openTelegram(id){
+      const url=itemsById.get(String(id))?.url;
+      if(!url||!/^https:\/\/t\.me\//i.test(url))return;
+      const app=window.Telegram?.WebApp;
+      if(typeof app?.openTelegramLink==='function')app.openTelegramLink(url);
+      else if(typeof app?.openLink==='function')app.openLink(url);
+      else window.location.assign(url);
+    }
+    document.addEventListener('click',event=>{
+      const screen=event.target.closest('[data-screen]');if(screen){show(screen.dataset.screen);return}
+      const open=event.target.closest('[data-open-id]');if(open){openTelegram(open.dataset.openId);return}
+      const save=event.target.closest('[data-save-id]');if(save){const id=save.dataset.saveId;saved.has(id)?saved.delete(id):saved.add(id);localStorage.setItem('smyslogen-favorites',JSON.stringify([...saved]));render();return}
+      const chip=event.target.closest('[data-topic]');if(chip){currentTopic=chip.dataset.topic;render()}
+    });
+    document.addEventListener('input',event=>{if(!event.target.classList.contains('filterInput'))return;const q=event.target.value.toLocaleLowerCase('ru');document.querySelectorAll(`#${event.target.dataset.target} .material`).forEach(card=>card.classList.toggle('hidden',!searchText(itemsById.get(card.dataset.id)).includes(q)))});
+    $('#homeSearch').addEventListener('input',event=>renderHome(event.target.value));
     loadLibrary();
   </script>
 </body>
