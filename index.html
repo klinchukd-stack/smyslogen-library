@@ -125,12 +125,15 @@
       renderHome($('#homeSearch').value);
     }
     function show(id){document.querySelectorAll('.screen').forEach(screen=>screen.classList.toggle('active',screen.id===id));document.querySelectorAll('.nav').forEach(button=>button.classList.toggle('active',button.dataset.screen===id));document.documentElement.scrollTop=0;document.body.scrollTop=0;}
+    function toTelegramDeepLink(sourceUrl){
+      const privatePost=String(sourceUrl||'').match(/^https?:\/\/t\.me\/c\/(\d+)\/(\d+)/i);
+      return privatePost?`tg://privatepost?channel=${privatePost[1]}&post=${privatePost[2]}`:sourceUrl;
+    }
     function openTelegram(id){
-      const url=itemsById.get(String(id))?.url;
-      if(!url||!/^https:\/\/t\.me\//i.test(url))return;
+      const url=toTelegramDeepLink(itemsById.get(String(id))?.url);
+      if(!url)return;
       const app=window.Telegram?.WebApp;
       if(typeof app?.openTelegramLink==='function')app.openTelegramLink(url);
-      else if(typeof app?.openLink==='function')app.openLink(url);
       else window.location.assign(url);
     }
     document.addEventListener('click',event=>{
