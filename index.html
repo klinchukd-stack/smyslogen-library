@@ -77,7 +77,7 @@
       const tags=document.createElement('div');tags.className='tags';
       item.tags.forEach(tag=>{const chip=document.createElement('span');chip.className='tag';chip.textContent=tag;tags.append(chip)});
       const save=document.createElement('button');save.type='button';save.className='save'+(saved.has(item.id)?' saved':'');save.dataset.saveId=item.id;save.setAttribute('aria-label','Сохранить');save.textContent=saved.has(item.id)?'★':'☆';
-        const open=document.createElement('a');open.className='open';open.dataset.openId=item.id;open.href=item.url;open.target='_blank';open.rel='noopener noreferrer';open.textContent='Открыть в Telegram';
+        const open=document.createElement('a');open.className='open';open.dataset.openId=item.id;open.href=item.url;open.textContent='Открыть в Telegram';
       card.append(title,meta,tags,save,open);return card;
     }
     function fill(selector,list,message){
