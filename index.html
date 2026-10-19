@@ -128,14 +128,24 @@
       function isDesktopApp(){
         return ['macos','tdesktop'].includes(String(window.Telegram?.WebApp?.platform||'').toLowerCase());
       }
+      function desktopPostUrl(sourceUrl){
+        const match=String(sourceUrl||'').match(/^https:\/\/t\.me\/c\/(\d+)\/(\d+)/i);
+        if(!match)return sourceUrl;
+        const bridge=new URL('./open-post.html',window.location.href);
+        bridge.search='';
+        bridge.searchParams.set('channel',match[1]);
+        bridge.searchParams.set('post',match[2]);
+        return bridge.toString();
+      }
       function openTelegram(event,link){
         const url=itemsById.get(String(link.dataset.openId))?.url;
         if(!url||!/^https:\/\/t\.me\//i.test(url)){event.preventDefault();return}
         const app=window.Telegram?.WebApp;
         if(isDesktopApp()){
           event.preventDefault();
-          if(typeof app?.openLink==='function')app.openLink(url);
-          else window.location.assign(url);
+          const browserUrl=desktopPostUrl(url);
+          if(typeof app?.openLink==='function')app.openLink(browserUrl);
+          else window.location.assign(browserUrl);
           return;
         }
         event.preventDefault();
