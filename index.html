@@ -133,6 +133,8 @@
         if(!url||!/^https:\/\/t\.me\//i.test(url)){event.preventDefault();return}
         const app=window.Telegram?.WebApp;
         if(isDesktopApp()){
+          event.preventDefault();
+          window.location.assign(url);
           return;
         }
         event.preventDefault();
